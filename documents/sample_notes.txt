@@ -1,0 +1,17 @@
+# Sample knowledge base: Machine Learning
+
+Supervised learning uses labelled examples to learn a mapping from inputs to known outputs.
+Classification predicts discrete categories, such as whether an email is spam.
+Regression predicts numerical values, such as the price of a house.
+
+Unsupervised learning works with data that does not have labelled outputs.
+Clustering groups similar data points together. K-means is a common clustering algorithm.
+
+An embedding represents text as a numerical vector. Embedding models are trained so that
+semantically related text often has vectors that are close under a similarity measure.
+
+Retrieval-Augmented Generation, or RAG, retrieves relevant information from an external
+knowledge source and provides it to a language model as context before the model generates
+an answer. A typical RAG pipeline loads documents, splits them into chunks, embeds the
+chunks, indexes the vectors, retrieves relevant chunks for a question, and calls a language
+model with the question and retrieved context.
