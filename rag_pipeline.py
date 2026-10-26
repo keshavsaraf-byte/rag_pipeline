@@ -9,6 +9,7 @@ import os
 import requests
 import numpy as np
 import faiss
+from web_search import search_and_fetch
 
 from pathlib import Path
 from pypdf import PdfReader
@@ -115,6 +116,28 @@ def chunk_documents(documents):
     print(f"Created {len(chunks)} chunks.")
     return chunks
 
+
+## WEB SEARCH TO CHUNKS 
+def get_web_chunks(query, max_results=3):
+    web_documents = search_and_fetch(
+        query,
+        max_results=max_results
+    )
+
+    web_chunks = []
+
+    for doc in web_documents:
+        web_chunks.append({
+            "text": (
+                f"Title: {doc['title']}\n"
+                f"Content: {doc['content'][:3000]}\n"
+                f"Source URL: {doc['url']}"
+            ),
+            "source": doc["url"],
+            "page": None
+        })
+
+    return web_chunks
 
 # 4. GENERATE EMBEDDINGS
 def create_embeddings(chunks, embedding_model):
@@ -292,6 +315,7 @@ def generate_answer(question, retrieved_chunks):
 
 
 # 10. MAIN PIPELINE
+
 def main():
     print("Loading embedding model...")
     embedding_model = SentenceTransformer(EMBEDDING_MODEL)
@@ -317,38 +341,70 @@ def main():
         if not question:
             continue
 
-        retrieved_chunks = retrieve_chunks(
-            question,
-            embedding_model,
-            index,
-            chunks,
-            top_k=TOP_K
-        )
+        print("\n1. Search local documents")
+        print("2. Search the web")
+        print("3. Search both")
 
-        if not retrieved_chunks:
-            print("No relevant chunks were found.")
-            continue
-
-        print("\n--- Retrieved Context ---")
-
-        for i, chunk in enumerate(retrieved_chunks, start=1):
-            location = chunk["source"]
-
-            if chunk["page"] is not None:
-                location += f", page {chunk['page']}"
-
-            print(f"\n{i}. {location}")
-            print(f"Cosine similarity: {chunk['score']:.4f}")
-            print(chunk["text"][:400])
+        choice = input("Choose an option (1/2/3): ").strip()
 
         try:
+            if choice == "1":
+                retrieved_chunks = retrieve_chunks(
+                    question,
+                    embedding_model,
+                    index,
+                    chunks,
+                    top_k=TOP_K
+                )
+
+            elif choice == "2":
+                retrieved_chunks = get_web_chunks(question)
+
+            elif choice == "3":
+                local_chunks = retrieve_chunks(
+                    question,
+                    embedding_model,
+                    index,
+                    chunks,
+                    top_k=TOP_K
+                )
+
+                web_chunks = get_web_chunks(question)
+                retrieved_chunks = local_chunks + web_chunks
+
+            else:
+                print("Invalid choice. Enter 1, 2, or 3.")
+                continue
+
+            if not retrieved_chunks:
+                print("No relevant chunks were found.")
+                continue
+
+            print("\n--- Retrieved Context ---")
+
+            for i, chunk in enumerate(retrieved_chunks, start=1):
+                location = chunk["source"]
+
+                if chunk["page"] is not None:
+                    location += f", page {chunk['page']}"
+
+                print(f"\n{i}. {location}")
+
+                if "score" in chunk:
+                    print(f"Cosine similarity: {chunk['score']:.4f}")
+
+                print(chunk["text"][:400])
+
             answer = generate_answer(question, retrieved_chunks)
 
             print("\n--- Final Answer ---")
             print(answer)
 
         except (requests.RequestException, RuntimeError, ValueError) as error:
-            print(f"\nLLM API request failed: {error}")
+            print(f"\nRAG request failed: {error}")
+
+        except Exception as error:
+            print(f"\nUnexpected error: {error}")
 
         print("\n" + "=" * 60)
 
